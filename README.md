@@ -29,7 +29,7 @@ flowchart TD
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/your-org/medusa-gcp-deploy.git
+   git clone https://github.com/srshukla2001/medusa-storefront-highpre.git
    cd medusa-gcp-deploy
    ```
 
