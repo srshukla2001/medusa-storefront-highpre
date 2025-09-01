@@ -1,125 +1,88 @@
-<p align="center">
-  <a href="https://www.medusajs.com">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/59018053/229103275-b5e482bb-4601-46e6-8142-244f531cebdb.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
-    <img alt="Medusa logo" src="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
-    </picture>
-  </a>
-</p>
 
-<h1 align="center">
-  Medusa Next.js Starter Template
-</h1>
+# Medusa.js on Google Cloud
 
-<p align="center">
-Combine Medusa's modules for your commerce backend with the newest Next.js 15 features for a performant storefront.</p>
+This repository provides a Click-to-Deploy guide for running Medusa.js (headless commerce) on Google Cloud Platform using Cloud Run, Cloud SQL, and Cloud Storage.
 
-<p align="center">
-  <a href="https://github.com/medusajs/medusa/blob/master/CONTRIBUTING.md">
-    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs welcome!" />
-  </a>
-  <a href="https://discord.gg/xpCwq3Kfn8">
-    <img src="https://img.shields.io/badge/chat-on%20discord-7289DA.svg" alt="Discord Chat" />
-  </a>
-  <a href="https://twitter.com/intent/follow?screen_name=medusajs">
-    <img src="https://img.shields.io/twitter/follow/medusajs.svg?label=Follow%20@medusajs" alt="Follow @medusajs" />
-  </a>
-</p>
+## Architecture
 
-### Prerequisites
-
-To use the [Next.js Starter Template](https://medusajs.com/nextjs-commerce/), you should have a Medusa server running locally on port 9000.
-For a quick setup, run:
-
-```shell
-npx create-medusa-app@latest
+```mermaid
+flowchart TD
+    A[User] -->|HTTPS| B[Cloud Run - Medusa.js]
+    B --> C[Cloud SQL - PostgreSQL]
+    B --> D[Cloud Storage - Media Assets]
+    B --> E[Cloud Logging & Monitoring]
 ```
 
-Check out [create-medusa-app docs](https://docs.medusajs.com/create-medusa-app) for more details and troubleshooting.
+- Cloud Run → Hosts the Medusa.js service (scales automatically).
+- Cloud SQL (PostgreSQL) → Managed database backend.
+- Cloud Storage → Stores product images and media.
+- Cloud Logging & Monitoring → Provides observability.
 
-# Overview
+## Prerequisites
 
-The Medusa Next.js Starter is built with:
+- A Google Cloud Project with billing enabled
+- gcloud CLI installed and authenticated
+- Docker installed (for building the container)
+- Basic knowledge of Node.js and Medusa.js
 
-- [Next.js](https://nextjs.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Typescript](https://www.typescriptlang.org/)
-- [Medusa](https://medusajs.com/)
+## Deployment Steps
 
-Features include:
+1. Clone the repository
+   ```bash
+   git clone https://github.com/your-org/medusa-gcp-deploy.git
+   cd medusa-gcp-deploy
+   ```
 
-- Full ecommerce support:
-  - Product Detail Page
-  - Product Overview Page
-  - Product Collections
-  - Cart
-  - Checkout with Stripe
-  - User Accounts
-  - Order Details
-- Full Next.js 15 support:
-  - App Router
-  - Next fetching/caching
-  - Server Components
-  - Server Actions
-  - Streaming
-  - Static Pre-Rendering
+2. Enable required services
+   ```bash
+   gcloud services enable run.googleapis.com sqladmin.googleapis.com storage.googleapis.com
+   ```
 
-# Quickstart
+3. Create a Cloud SQL instance
+   ```bash
+   gcloud sql instances create medusa-db \
+     --database-version=POSTGRES_14 \
+     --cpu=2 --memory=4GB --region=us-central1
+   ```
 
-### Setting up the environment variables
+   Create a database and user:
+   ```bash
+   gcloud sql databases create medusa --instance=medusa-db
+   gcloud sql users create medusa-user --instance=medusa-db --password=yourpassword
+   ```
 
-Navigate into your projects directory and get your environment variables ready:
+4. Create a Cloud Storage bucket
+   ```bash
+   gsutil mb -l us-central1 gs://your-medusa-media/
+   ```
 
-```shell
-cd nextjs-starter-medusa/
-mv .env.template .env.local
-```
+5. Build & push Docker image
+   ```bash
+   gcloud builds submit --tag gcr.io/$(gcloud config get-value project)/medusa-app
+   ```
 
-### Install dependencies
+6. Deploy to Cloud Run
+   ```bash
+   gcloud run deploy medusa-service \
+     --image gcr.io/$(gcloud config get-value project)/medusa-app \
+     --add-cloudsql-instances $(gcloud sql instances describe medusa-db --format="value(connectionName)") \
+     --region us-central1 \
+     --platform managed \
+     --allow-unauthenticated
+   ```
 
-Use Yarn to install all dependencies.
+7. Set environment variables (Cloud Run → Variables & Secrets)
+   - DATABASE_URL=postgresql://medusa-user:yourpassword@/medusa?host=/cloudsql/PROJECT:REGION:medusa-db
+   - BUCKET_NAME=your-medusa-media
 
-```shell
-yarn
-```
+8. Verify deployment  
+   Open the Cloud Run service URL. You should see Medusa.js running.
 
-### Start developing
+## Monitoring
 
-You are now ready to start up your project.
+- Logs → Cloud Logging
+- Metrics → Cloud Monitoring
 
-```shell
-yarn dev
-```
+## License
 
-### Open the code and start customizing
-
-Your site is now running at http://localhost:8000!
-
-# Payment integrations
-
-By default this starter supports the following payment integrations
-
-- [Stripe](https://stripe.com/)
-
-To enable the integrations you need to add the following to your `.env.local` file:
-
-```shell
-NEXT_PUBLIC_STRIPE_KEY=<your-stripe-public-key>
-```
-
-You'll also need to setup the integrations in your Medusa server. See the [Medusa documentation](https://docs.medusajs.com) for more information on how to configure [Stripe](https://docs.medusajs.com/resources/commerce-modules/payment/payment-provider/stripe#main).
-
-# Resources
-
-## Learn more about Medusa
-
-- [Website](https://www.medusajs.com/)
-- [GitHub](https://github.com/medusajs)
-- [Documentation](https://docs.medusajs.com/)
-
-## Learn more about Next.js
-
-- [Website](https://nextjs.org/)
-- [GitHub](https://github.com/vercel/next.js)
-- [Documentation](https://nextjs.org/docs)
+Apache 2.0
